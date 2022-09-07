@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Archtecture"
+        required: true
+        default: "x86_64"
+        type: choice
+        options: 
+        - "arm"
+        - "arm64"
+        - "x86"
+        - "x86_64"
+      api:
+        description: "API Level"
+        required: true
+        default: "12.1"
+        type: choice
+        options:
+        - "9"
+        - "10"
+        - "11"
+        - "12.1"
+        - "13"
+        
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          if [ ${{ github.event.inputs.api }} == "9" ]; then
+            arch="pi"
+          elif [ ${{ github.event.inputs.api }} == "10" ]; then
+            arch="qoppa"
+          elif [ ${{ github.event.inputs.api }}" == "11" ]; then
+            arch="rho"
+          elif [ ${{ github.event.inputs.api }}" == "12.1" ]; then
+            arch="sigma"
+          elif [ ${{ github.event.inputs.api }} == "13" ]; then
+            arch="tau"
+          fi
+          git clone -b $arch https://gitlab.com/MindTheGapps/vendor_gapps.git
+          cd ./vendor_gapps
+          make gapps_${{ github.event.inputs.arch }}
+
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with: 
+          name: Built_MindTheGapps
+          path: ./vendor_gapps/out/MindTheGapps-*.zip
