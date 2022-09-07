@@ -38,15 +38,15 @@ jobs:
 
       - name: Build
         run: |
-          if [ ${{ github.event.inputs.api }} == "9" ]; then
+          if [ "${{ github.event.inputs.api }}" == "9" ]; then
             arch="pi"
-          elif [ ${{ github.event.inputs.api }} == "10" ]; then
+          elif [ "${{ github.event.inputs.api }}" == "10" ]; then
             arch="qoppa"
-          elif [ ${{ github.event.inputs.api }}" == "11" ]; then
+          elif [ "${{ github.event.inputs.api }}" == "11" ]; then
             arch="rho"
-          elif [ ${{ github.event.inputs.api }}" == "12.1" ]; then
+          elif [ "${{ github.event.inputs.api }}" == "12.1" ]; then
             arch="sigma"
-          elif [ ${{ github.event.inputs.api }} == "13" ]; then
+          elif [ "${{ github.event.inputs.api }}" == "13" ]; then
             arch="tau"
           fi
           git clone -b $arch https://gitlab.com/MindTheGapps/vendor_gapps.git
