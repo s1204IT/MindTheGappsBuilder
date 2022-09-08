@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build
         run: |
@@ -51,7 +51,20 @@ jobs:
           fi
           git clone -b $arch https://gitlab.com/MindTheGapps/vendor_gapps.git
           cd ./vendor_gapps
+          if [ $arch = "sigma" -o $arch = "tau" ]; then
+            sudo apt-get install -y aapt zipalign
+            mkdir -p common/proprietary/product/overlay
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
+            aapt package -M overlay/GmsSettingsProviderOverlay/AndroidManifest.xml -S overlay/GmsOverlay/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F GmsSettingsProviderOverlay.apk.u
+            jarsigner -keystore ./debug.keystore GmsSettingsProviderOverlay.apk.u androiddebugkey -storepass android
+            zipalign 4 GmsSettingsProviderOverlay.apk.u GmsSettingsProviderOverlay.apk
+            aapt package -M overlay/GmsOverlay/AndroidManifest.xml -S overlay/GmsSettingsProviderOverlay/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F GmsOverlay.apk.u
+            jarsigner -keystore ./debug.keystore GmsOverlay.apk.u androiddebugkey -storepass android
+            zipalign 4 GmsOverlay.apk.u GmsOverlay.apk
+            mv *.apk common/proprietary/product/overlay
+          fi
           make gapps_${{ github.event.inputs.arch }}
+          
 
       - name: Upload
         uses: actions/upload-artifact@v2
