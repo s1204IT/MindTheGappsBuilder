@@ -13,8 +13,8 @@ on:
         - "arm64"
         - "x86"
         - "x86_64"
-      api:
-        description: "API Level"
+      androidv:
+        description: "Android Version"
         required: true
         default: "12.1"
         type: choice
@@ -33,25 +33,41 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Check out
-        uses: actions/checkout@v3
+      - name: Cache repository
+        id: cache-repository
+        uses: actions/cache@v3
+        with:
+          path: |
+            vendor_gapps/*
+            !vendor_gapps/out
+          key: MindTheGapps-${{ hashFiles('**/packed-refs') }}
+          restore-keys: MindTheGapps-
+
+      - name: Map Android Version to tree
+        run: |
+          declare -A ANDROID_VER_MAP=([9]="pi" [10]="qoppa" [11]="rho" ["12.1"]="sigma" [13]="tau")
+          ANDROID_VER=${ANDROID_VER_MAP[${{ github.event.inputs.androidv }}]}
+          echo "ANDROIDV=$ANDROID_VER" >> $GITHUB_ENV
+
+      - name: Clone repository
+        if: steps.cache-repository.outputs.cache-hit != 'true'
+        run: |
+          rm -rf vendor_gapps
+          git clone -b ${{ env.ANDROIDV }} --filter=tree:0 https://gitlab.com/MindTheGapps/vendor_gapps.git
+
+      - name: Update repository
+        if: steps.cache-repository.outputs.cache-hit == 'true'
+        run: |
+          cd ./vendor_gapps
+          git clean -fxd
+          git switch ${{ env.ANDROIDV }}
+          git pull
 
       - name: Build
         run: |
-          if [ "${{ github.event.inputs.api }}" == "9" ]; then
-            arch="pi"
-          elif [ "${{ github.event.inputs.api }}" == "10" ]; then
-            arch="qoppa"
-          elif [ "${{ github.event.inputs.api }}" == "11" ]; then
-            arch="rho"
-          elif [ "${{ github.event.inputs.api }}" == "12.1" ]; then
-            arch="sigma"
-          elif [ "${{ github.event.inputs.api }}" == "13" ]; then
-            arch="tau"
-          fi
-          git clone -b $arch https://gitlab.com/MindTheGapps/vendor_gapps.git
+          ANDROID_VER=${{ env.ANDROIDV }}
           cd ./vendor_gapps
-          if [ $arch = "sigma" -o $arch = "tau" ]; then
+          if [ "$ANDROID_VER" = "sigma" ] || [ "$ANDROID_VER" = "tau" ]; then
             sudo apt-get install -y aapt zipalign
             mkdir -p common/proprietary/product/overlay
             keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
@@ -63,11 +79,12 @@ jobs:
             zipalign 4 GmsOverlay.apk.u GmsOverlay.apk
             mv *.apk common/proprietary/product/overlay
           fi
-          make gapps_${{ github.event.inputs.arch }}
-          
+          make gapps_"${{ github.event.inputs.arch }}"
+          DATA=$(date -u +%Y%m%d_%H%M%S)
+          echo "DATA=$DATA" >> $GITHUB_ENV
 
       - name: Upload
-        uses: actions/upload-artifact@v2
-        with: 
-          name: Built_MindTheGapps
-          path: ./vendor_gapps/out/MindTheGapps-*.zip
+        uses: actions/upload-artifact@v3
+        with:
+          name: Built_MindTheGapps-${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}-${{ env.DATA }}.zip
+          path: ./vendor_gapps/out/*
