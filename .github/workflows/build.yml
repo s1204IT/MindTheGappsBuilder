@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       arch:
-        description: "Archtecture"
+        description: "Architecture"
         required: true
         default: "x86_64"
         type: choice
