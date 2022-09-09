@@ -24,6 +24,11 @@ on:
           - "11"
           - "12.1"
           - "13"
+      release:
+        description: "Upload to release"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -84,10 +89,23 @@ jobs:
           fi
           make gapps_"${{ github.event.inputs.arch }}"
           DATA=$(date -u +%Y%m%d_%H%M%S)
-          echo "DATA=$DATA" >> $GITHUB_ENV
+          echo "artifact_name=Built_MindTheGapps-${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}-$DATA" >> $GITHUB_ENV
 
       - name: Upload
+        if: ${{ github.event.inputs.release != 'true' }}
         uses: actions/upload-artifact@v3
         with:
-          name: Built_MindTheGapps-${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}-${{ env.DATA }}
+          name: ${{ env.artifact_name }}
           path: ./vendor_gapps/out/*
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.event.inputs.release == 'true' }}
+        with:
+          tag_name: ${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}
+          draft: true
+          prerelease: true
+          files: ./vendor_gapps/out/*
+
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
