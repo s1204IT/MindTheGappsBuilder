@@ -8,29 +8,27 @@ on:
         required: true
         default: "x86_64"
         type: choice
-        options: 
-        - "arm"
-        - "arm64"
-        - "x86"
-        - "x86_64"
+        options:
+          - "arm"
+          - "arm64"
+          - "x86"
+          - "x86_64"
       androidv:
         description: "Android Version"
         required: true
         default: "12.1"
         type: choice
         options:
-        - "9"
-        - "10"
-        - "11"
-        - "12.1"
-        - "13"
-        
+          - "9"
+          - "10"
+          - "11"
+          - "12.1"
+          - "13"
+
 jobs:
   build:
     name: Build
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Cache repository
@@ -59,6 +57,7 @@ jobs:
         if: steps.cache-repository.outputs.cache-hit == 'true'
         run: |
           cd ./vendor_gapps
+          git restore .
           git clean -fxd
           git switch ${{ env.ANDROIDV }}
           git pull
@@ -67,16 +66,20 @@ jobs:
         run: |
           ANDROID_VER=${{ env.ANDROIDV }}
           cd ./vendor_gapps
-          if [ "$ANDROID_VER" = "sigma" ] || [ "$ANDROID_VER" = "tau" ]; then
+          if [ -d overlay ]; then
             sudo apt-get install -y aapt zipalign
             mkdir -p common/proprietary/product/overlay
+            sed -i -e '/overlay/d' ./build/gapps.sh
+            sed -i -e '/RROs/d' ./build/gapps.sh
             keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
-            aapt package -M overlay/GmsSettingsProviderOverlay/AndroidManifest.xml -S overlay/GmsOverlay/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F GmsSettingsProviderOverlay.apk.u
-            jarsigner -keystore ./debug.keystore GmsSettingsProviderOverlay.apk.u androiddebugkey -storepass android
-            zipalign 4 GmsSettingsProviderOverlay.apk.u GmsSettingsProviderOverlay.apk
-            aapt package -M overlay/GmsOverlay/AndroidManifest.xml -S overlay/GmsSettingsProviderOverlay/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F GmsOverlay.apk.u
-            jarsigner -keystore ./debug.keystore GmsOverlay.apk.u androiddebugkey -storepass android
-            zipalign 4 GmsOverlay.apk.u GmsOverlay.apk
+            echo "Compiling RROs"
+            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
+            do
+                echo "Building ${dir/overlay\//}"
+                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F "${dir/overlay\//}".apk.u
+                jarsigner -keystore debug.keystore "${dir/overlay\//}".apk.u androiddebugkey -storepass android
+                zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
+            done
             mv *.apk common/proprietary/product/overlay
           fi
           make gapps_"${{ github.event.inputs.arch }}"
