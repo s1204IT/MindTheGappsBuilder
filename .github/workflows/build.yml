@@ -76,14 +76,12 @@ jobs:
             mkdir -p common/proprietary/product/overlay
             sed -i -e '/overlay/d' ./build/gapps.sh
             sed -i -e '/RROs/d' ./build/gapps.sh
-            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
             echo "Compiling RROs"
-            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
-            do
+            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
                 echo "Building ${dir/overlay\//}"
-                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-32/android.jar -F "${dir/overlay\//}".apk.u
-                jarsigner -keystore debug.keystore "${dir/overlay\//}".apk.u androiddebugkey -storepass android
-                zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
+                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-33/android.jar -F "${dir/overlay\//}".apk.u
+                zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk.s
+                java -jar build/sign/signapk.jar build/sign/testkey.x509.pem build/sign/testkey.pk8 "${dir/overlay\//}".apk.s "${dir/overlay\//}".apk
             done
             mv *.apk common/proprietary/product/overlay
           fi
@@ -104,7 +102,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}
           draft: true
-          prerelease: true
+          prerelease: false
           files: ./vendor_gapps/out/*
 
       - name: Delete workflow runs
