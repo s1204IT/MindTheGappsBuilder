@@ -1,34 +1,37 @@
-name: Build
+name: WSA
 
 on:
   workflow_dispatch:
     inputs:
-      arch:
-        description: "Architecture"
+      release:
+        description: "Upload to release"
         required: true
-        default: "x86_64"
-        type: choice
-        options:
-          - "arm"
-          - "arm64"
-          - "x86"
-          - "x86_64"
-      androidv:
-        description: "Android Version"
-        required: true
-        default: "12.1"
-        type: choice
-        options:
-          - "9"
-          - "10"
-          - "11"
-          - "12.1"
-          - "13"
+        default: false
+        type: boolean
 
 jobs:
-  build:
-    name: Build
+  matrix:
+    name: Generate build matrix
     runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.setup.outputs.matrix }}
+    steps:
+      - name: Generate build matrix
+        id: setup
+        uses: actions/github-script@v6
+        with:
+          script: |
+            let matrix = {};
+            matrix.androidv = ["12.1", 13]
+            matrix.arch = ["x86_64", "arm64"]
+            core.setOutput("matrix", JSON.stringify(matrix));
+
+  build:
+    name: Build ${{ matrix.androidv }}-${{ matrix.arch }}
+    runs-on: ubuntu-20.04
+    needs: matrix
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
 
     steps:
       - name: Cache repository
@@ -38,13 +41,13 @@ jobs:
           path: |
             vendor_gapps/*
             !vendor_gapps/out
-          key: MindTheGapps-${{ hashFiles('**/packed-refs') }}
-          restore-keys: MindTheGapps-
+          key: MindTheGapps-${{ matrix.androidv }}-${{ hashFiles('**/packed-refs') }}
+          restore-keys: MindTheGapps-${{ matrix.androidv }}-
 
       - name: Map Android Version to tree
         run: |
-          declare -A ANDROID_VER_MAP=([9]="pi" [10]="qoppa" [11]="rho" ["12.1"]="sigma" [13]="tau")
-          ANDROID_VER=${ANDROID_VER_MAP[${{ github.event.inputs.androidv }}]}
+          declare -A ANDROID_VER_MAP=(["12.1"]="sigma" [13]="tau")
+          ANDROID_VER=${ANDROID_VER_MAP[${{ matrix.androidv }}]}
           echo "ANDROIDV=$ANDROID_VER" >> $GITHUB_ENV
 
       - name: Clone repository
@@ -80,15 +83,23 @@ jobs:
             done
             mv *.apk common/proprietary/product/overlay
           fi
-          make gapps_"${{ github.event.inputs.arch }}"
-          DATA=$(date -u +%Y%m%d_%H%M%S)
-          echo "artifact_name=Built_MindTheGapps-${{ github.event.inputs.androidv }}-${{ github.event.inputs.arch }}-$DATA" >> $GITHUB_ENV
+          sed -i -e 's/_%H%M%S//g' build/gapps.sh
+          make gapps_"${{ matrix.arch }}"
+          sed -i -e 's/\ \ .*//' out/*.md5sum
+          echo "tag_name=$(date -u +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Upload
+        if: ${{ github.event.inputs.release != 'true' }}
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.artifact_name }}
+          name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.tag_name }}
           path: ./vendor_gapps/out/*
 
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.event.inputs.release == 'true' }}
+        with:
+          tag_name: ${{ env.tag_name }}
+          draft: true
+          prerelease: false
+          files: ./vendor_gapps/out/*
