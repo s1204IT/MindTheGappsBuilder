@@ -16,6 +16,7 @@ jobs:
     outputs:
       matrix: ${{ steps.setup.outputs.matrix }}
     steps:
+
       - name: Generate build matrix
         id: setup
         uses: actions/github-script@v6
@@ -34,6 +35,7 @@ jobs:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
 
     steps:
+
       - name: Map Android Version to tree
         run: |
           declare -A ANDROID_VER_MAP=([9]="pi" [10]="qoppa" [11]="rho" ["12.1"]="sigma" [13]="tau")
@@ -45,43 +47,45 @@ jobs:
         run: git clone -b ${{ env.ANDROIDV }} --filter=tree:0 https://gitlab.com/MindTheGapps/vendor_gapps.git
 
       - name: Build
+        working-directory: vendor_gapps
         continue-on-error: true
         run: |
-          ANDROID_VER=${{ env.ANDROIDV }}
-          cd ./vendor_gapps
-          echo "tag_name=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           if [ -d overlay ]; then
             sudo apt-get install -y aapt zipalign
             mkdir -p common/proprietary/product/overlay
-            sed -i -e '/overlay/d' ./build/gapps.sh
-            sed -i -e '/RROs/d' ./build/gapps.sh
+            sed -i -e '/overlay/d' build/gapps.sh
+            sed -i -e '/RROs/d' build/gapps.sh
             echo "Compiling RROs"
             find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
             do
                 echo "Building ${dir/overlay\//}"
                 aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
-                zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk.s
+                zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk.s
                 java -jar build/sign/signapk.jar build/sign/testkey.x509.pem build/sign/testkey.pk8 "${dir/overlay\//}".apk.s "${dir/overlay\//}".apk
             done
-            mv *.apk common/proprietary/product/overlay
+            mv -v *.apk common/proprietary/product/overlay
           fi
           sed -i -e 's/_%H%M%S//g' build/gapps.sh
+          echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           make gapps_"${{ matrix.arch }}"
           sed -i -e 's/\ .*//' out/*.md5sum
+          mv gapps_log out/
 
       - name: Upload
-        if: ${{ github.event.inputs.release != 'true' }}
+        if: github.event.inputs.release != 'true'
         uses: actions/upload-artifact@v3
         with:
-          name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.tag_name }}
-          path: ./vendor_gapps/out/*
+          name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
+          path: vendor_gapps/out/*
           if-no-files-found: ignore
 
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: ${{ github.event.inputs.release == 'true' }}
+        if: github.event.inputs.release == 'true'
         with:
-          tag_name: ${{ env.tag_name }}
+          tag_name: ${{ env.date }}
           draft: true
           prerelease: false
-          files: ./vendor_gapps/out/*
+          files: |
+            vendor_gapps/out/*
+            !vendor_gapps/out/gapps_log
