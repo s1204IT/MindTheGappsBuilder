@@ -95,6 +95,7 @@ jobs:
           known_hosts: ${{ vars.SF_HOSTS }}
 
       - name: Upload to SourceForge
+        continue-on-error: true
         if: github.event.inputs.release == 'true'
         working-directory: vendor_gapps/out
         run: |
