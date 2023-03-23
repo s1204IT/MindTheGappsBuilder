@@ -43,7 +43,7 @@ jobs:
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
       - name: Clone repository
-        run: git clone -b ${{ env.ANDROIDV }} --filter=tree:0 https://gitlab.com/MindTheGapps/vendor_gapps.git
+        run: git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git
 
       - name: Build
         working-directory: vendor_gapps
