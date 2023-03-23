@@ -1,4 +1,4 @@
-name: Build
+name: Build MindTheGapps
 
 on:
   workflow_dispatch:
@@ -33,7 +33,6 @@ jobs:
     needs: matrix
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-
     steps:
 
       - name: Map Android Version to tree
@@ -69,7 +68,6 @@ jobs:
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           make gapps_"${{ matrix.arch }}"
           sed -i -e 's/\ .*//' out/*.md5sum
-          mv gapps_log out/
 
       - name: Upload
         if: github.event.inputs.release != 'true'
@@ -88,4 +86,19 @@ jobs:
           prerelease: false
           files: |
             vendor_gapps/out/*
-            !vendor_gapps/out/gapps_log
+
+      - name: Setup SSH
+        uses: shimataro/ssh-key-action@v2
+        if: github.event.inputs.release == 'true'
+        with:
+          key: ${{ secrets.SSH_KEY }}
+          known_hosts: ${{ vars.SF_HOSTS }}
+
+      - name: Upload to SourceForge
+        if: github.event.inputs.release == 'true'
+        working-directory: vendor_gapps/out
+        run: |
+          mkdir ${{ matrix.arch }}
+          mkdir ${{ matrix.arch }}/${{ env.date }}
+          mv *.* ${{ matrix.arch }}/${{ env.date }}
+          rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
