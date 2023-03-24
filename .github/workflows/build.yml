@@ -4,7 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "Upload to release"
+        description: "Release"
+        required: true
+        default: false
+        type: boolean
+      old:
+        description: "Build removed versions"
         required: true
         default: false
         type: boolean
@@ -23,7 +28,11 @@ jobs:
         with:
           script: |
             let matrix = {};
-            matrix.androidv = [9, 10, 11, "12.1", 13]
+            if ('${{ github.event.inputs.old }}' === 'true') {
+                matrix.androidv = ["5.1", "7.1.1", "7.1.2", "8.1", 9, 10, 11, "12.1", 13]
+            } else {
+                matrix.androidv = [9, 10, 11, "12.1", 13]
+            }
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
 
@@ -41,14 +50,27 @@ jobs:
           echo "ANDROIDV=${ANDROID_VER_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
           declare -A ANDROID_API_MAP=([9]=28 [10]=29 [11]=30 ["12.1"]=32 [13]=33)
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
+          declare -A GITLAB_COMMIT_MAP=(["5.1"]="c62430937b1d63e3d8bb358a85ba90fed12a5a13" ["7.1.1"]="d5900b28910a85599694f23411e9f883546ae220" ["7.1.2"]="5af93c969f7135a63c7933b8ca3d658f7c79bad3" ["8.1"]="0f6b4560288267b644c49de0fdc538fa30980708")
+          echo "GITLAB_COMMIT=${GITLAB_COMMIT_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
       - name: Clone repository
-        run: git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git
+        run: |
+          if [ "${{ github.event.inputs.old }}" = "true" ]; then
+              mkdir vendor_gapps
+              cd vendor_gapps
+              git init
+              git remote add origin https://gitlab.com/MindTheGapps/vendor_gapps.git/ -t pi
+              git fetch origin ${{ env.GITLAB_COMMIT }} --depth=1
+              git reset --hard FETCH_HEAD
+          else
+              git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git/
+          fi
 
       - name: Build
         working-directory: vendor_gapps
         continue-on-error: true
         run: |
+          if [ ! "${{ matrix.androidv }}" = "12.1" ] && [ ! "${{ matrix.androidv }}" = "13" ] && [ "${{ matrix.arch }}" = "x86_64" ]; then exit 64; fi
           if [ -d overlay ]; then
             sudo apt-get install -y aapt zipalign
             mkdir -p common/proprietary/product/overlay
@@ -64,9 +86,16 @@ jobs:
             done
             mv -v *.apk common/proprietary/product/overlay
           fi
-          sed -i -e 's/_%H%M%S//g' build/gapps.sh
+          sed -i -e 's/_%H%M%S//' build/gapps.sh
+          if [ "${{ github.event.inputs.old }}" = "true" ]; then
+              sed -i -e 's/%F-%H-%M/%Y%m%d/g' build/gapps.sh
+              if [ "${{ matrix.androidv }}" = "5.1" ] || [ "${{ matrix.androidv }}" = "7.1.1" ]; then
+                  sed -i -e 's/\.md5/\.md5sum/g' build/gapps.sh
+                  sed -i -e 's/gapps-/MindTheGapps-/g' build/gapps.sh
+              fi
+          fi
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
-          make gapps_"${{ matrix.arch }}"
+          bash build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's/\ .*//' out/*.md5sum
 
       - name: Upload
