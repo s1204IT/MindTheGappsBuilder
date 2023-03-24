@@ -55,7 +55,7 @@ jobs:
 
       - name: Clone repository
         run: |
-          if [ "${{ github.event.inputs.old }}" = "true" ]; then
+          if [ "${{ matrix.androidv }}" = "5.1" ] || [ "${{ matrix.androidv }}" = "7.1.1" ] || [ "${{ matrix.androidv }}" = "7.1.2" ] || [ "${{ matrix.androidv }}" = "8.1" ]; then
               mkdir vendor_gapps
               cd vendor_gapps
               git init
