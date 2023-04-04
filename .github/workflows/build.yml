@@ -117,11 +117,12 @@ jobs:
             vendor_gapps/out/*
 
       - name: Setup SSH
-        uses: shimataro/ssh-key-action@v2
         if: github.event.inputs.release == 'true'
-        with:
-          key: ${{ secrets.SSH_KEY }}
-          known_hosts: ${{ vars.SF_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
+          echo ${{ secrets.SSH_KEY }} > ~/.ssh/id_ed25519
+          chmod 0644 ~/.ssh/id_ed25519
 
       - name: Upload to SourceForge
         continue-on-error: true
