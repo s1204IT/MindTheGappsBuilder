@@ -49,7 +49,7 @@ jobs:
         working-directory: vendor_gapps
         continue-on-error: true
         run: |
-          if [ "${{ matrix.androidv }}" != "12.1" ] && [ "${{ matrix.androidv }}" != "13" ] && [ "${{ matrix.arch }}" == "x86_64" ]; then exit 64; fi
+          if [[ "${{ matrix.androidv }}" != "12.1" && "${{ matrix.androidv }}" != "13" && "${{ matrix.arch }}" == "x86_64" ]]; then exit 64; fi
           if [ -d overlay ]; then
             sudo apt-get update
             sudo apt-get install -y aapt zipalign
@@ -69,7 +69,7 @@ jobs:
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
-          sed -i -e 's/\/home\/runner\/work\/MindTheGappsBuilder\/MindTheGappsBuilder\/vendor_gapps/out\///' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}.zip.md5sum
+          sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}.zip.md5sum
 
       - name: Upload
         if: github.event.inputs.release != 'true'
