@@ -77,7 +77,7 @@ jobs:
         with:
           name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
           path: vendor_gapps/out/*
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Setup SSH
         if: github.event.inputs.release == 'true'
