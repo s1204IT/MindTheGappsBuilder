@@ -49,7 +49,7 @@ jobs:
         working-directory: vendor_gapps
         continue-on-error: true
         run: |
-          if [ ${{ matrix.androidv }}" != "12.1" ] && [ "${{ matrix.androidv }}" != "13" ] && [ "${{ matrix.arch }}" == "x86_64" ]; then exit 64; fi
+          if [ "${{ matrix.androidv }}" != "12.1" ] && [ "${{ matrix.androidv }}" != "13" ] && [ "${{ matrix.arch }}" == "x86_64" ]; then exit 64; fi
           if [ -d overlay ]; then
             sudo apt-get update
             sudo apt-get install -y aapt zipalign
