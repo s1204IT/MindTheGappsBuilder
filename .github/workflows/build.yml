@@ -23,7 +23,7 @@ jobs:
         with:
           script: |
             let matrix = {};
-            matrix.androidv = [9, 10, 11, "12.1", 13]
+            matrix.androidv = ["9.0.0", "10.0.0", "11.0.0", "12.1.0", "13.0.0"]
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
 
@@ -37,9 +37,9 @@ jobs:
 
       - name: Map Android Version to tree
         run: |
-          declare -A ANDROID_VER_MAP=([9]="pi" [10]="qoppa" [11]="rho" ["12.1"]="sigma" [13]="tau")
+          declare -A ANDROID_VER_MAP=(["9.0.0"]="pi" ["10.0.0"]="qoppa" ["11.0.0"]="rho" ["12.1.0"]="sigma" ["13.0.0"]="tau")
           echo "ANDROIDV=${ANDROID_VER_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
-          declare -A ANDROID_API_MAP=([9]=28 [10]=29 [11]=30 ["12.1"]=32 [13]=33)
+          declare -A ANDROID_API_MAP=(["12.1.0"]=32 ["13.0.0"]=33)
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
       - name: Clone repository
