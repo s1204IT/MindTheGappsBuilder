@@ -45,6 +45,12 @@ jobs:
       - name: Clone repository
         run: git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git/
 
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
       - name: Build
         working-directory: vendor_gapps
         continue-on-error: true
@@ -57,12 +63,13 @@ jobs:
             sed -i -e '/overlay/d' build/gapps.sh
             sed -i -e '/RROs/d' build/gapps.sh
             echo "Compiling RROs"
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
             find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
             do
                 echo "Building ${dir/overlay\//}"
-                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}"-unaligned-unsigned.apk
-                zipalign -v 4 "${dir/overlay\//}"-unaligned-unsigned.apk "${dir/overlay\//}"-unsigned.apk
-                java -jar build/sign/signapk.jar build/sign/testkey.x509.pem build/sign/testkey.pk8 "${dir/overlay\//}"-unsigned.apk "${dir/overlay\//}".apk
+                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}"-.apk
+                jarsigner -keystore debug.keystore "${dir/overlay\//}".apk androiddebugkey -storepass android
+                zipalign -f -v 4 "${dir/overlay\//}".apk
                 mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
             done
           fi
