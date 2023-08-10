@@ -78,14 +78,17 @@ jobs:
             rm key.pem
           fi
           sed -i -e 's/_%H%M%S//' build/gapps.sh
-          echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
+          cdate="$(date -u +%Y%m%d)"
+          echo "date=$cdate" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
           mkdir -p out/${{ matrix.arch }}
-          mkdir -p out/${{ matrix.arch }}/${{ env.date }}
-          mkdir -p out/${{ matrix.arch }}/${{ env.date }}/keys
-          mv -v cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/${{ env.date }}/keys
-          mv -v out/*.* out/${{ matrix.arch }}/${{ env.date }}
+          mkdir -p out/${{ matrix.arch }}/$cdate
+          mv -v out/*.* out/${{ matrix.arch }}/$cdate
+          if [ -d overlay ]; then
+            mkdir -p out/${{ matrix.arch }}/$cdate/keys
+            mv -v cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/$cdate/keys
+          fi
 
       - name: Upload
         if: github.event.inputs.release != 'true'
