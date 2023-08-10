@@ -81,13 +81,20 @@ jobs:
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
+          mkdir out/${{ matrix.arch }}
+          mkdir out/${{ matrix.arch }}/${{ env.date }}
+          mkdir out/${{ matrix.arch }}/${{ env.date }}/keys
+          mv ../cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/${{ env.date }}/keys
 
       - name: Upload
         if: github.event.inputs.release != 'true'
         uses: actions/upload-artifact@v3
         with:
           name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
-          path: vendor_gapps/out/*
+          path: |
+            vendor_gapps/out/*.zip
+            vendor_gapps/out/*.zip.md5
+            vendor_gapps/out/keys/
           if-no-files-found: warn
 
       - name: Setup SSH
@@ -104,11 +111,7 @@ jobs:
         if: github.event.inputs.release == 'true'
         working-directory: vendor_gapps/out
         run: |
-          mkdir ${{ matrix.arch }}
-          mkdir ${{ matrix.arch }}/${{ env.date }}
-          mkdir ${{ matrix.arch }}/${{ env.date }}/keys
           mv *.* ${{ matrix.arch }}/${{ env.date }}
-          mv ../../cert-${{ matrix.androidv }}-${{ matrix.arch }}.* ${{ matrix.arch }}/${{ env.date }}/keys
           rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
 
       - name: Release
@@ -118,4 +121,7 @@ jobs:
           tag_name: ${{ env.date }}
           draft: false
           prerelease: false
-          files: vendor_gapps/out/*
+          files: |
+            vendor_gapps/out/*.zip
+            vendor_gapps/out/*.zip.md5sum
+            vendor_gapps/out/keys/*
