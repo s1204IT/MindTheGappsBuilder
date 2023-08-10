@@ -26,7 +26,7 @@ jobs:
             matrix.androidv = ["9.0.0", "10.0.0", "11.0.0", "12.1.0", "13.0.0"]
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
-            
+
   build:
     name: Build ${{ matrix.androidv }}-${{ matrix.arch }}
     runs-on: ubuntu-latest
@@ -59,8 +59,8 @@ jobs:
           cdate="$(date -u +%Y%m%d)"
           echo "date=$cdate" >> $GITHUB_ENV
           if [ -d overlay ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y aapt zipalign apksigner
+            sudo apt-get update
+            sudo apt-get install -y aapt zipalign apksigner
             openssl genrsa -f4 2048 > key.pem
             openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
             openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
