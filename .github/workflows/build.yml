@@ -27,12 +27,6 @@ jobs:
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
             
-      - name: Create signing keys
-        run: |
-          openssl genrsa -f4 2048 > key.pem
-          openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
-          openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
-
   build:
     name: Build ${{ matrix.androidv }}-${{ matrix.arch }}
     runs-on: ubuntu-latest
@@ -65,6 +59,9 @@ jobs:
           if [ -d overlay ]; then
             sudo apt-get update
             sudo apt-get install -y aapt zipalign apksigner
+            openssl genrsa -f4 2048 > key.pem
+            openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
+            openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
             mkdir common/proprietary/product/overlay
             sed -i -e '/overlay/d' build/gapps.sh
             sed -i -e '/RROs/d' build/gapps.sh
@@ -77,6 +74,8 @@ jobs:
                 apksigner sign --key cert.pk8 --cert cert.pem "${dir/overlay\//}".apk
                 mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
             done
+            mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}.pem
+            mv cert.pk8 cert-${{ matrix.androidv }}-${{ matrix.arch }}.pk8
           fi
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
@@ -107,8 +106,9 @@ jobs:
         run: |
           mkdir ${{ matrix.arch }}
           mkdir ${{ matrix.arch }}/${{ env.date }}
+          mkdir ${{ matrix.arch }}/${{ env.date }}/keys
           mv *.* ${{ matrix.arch }}/${{ env.date }}
-          mv ../cert.* ${{ matrix.arch }}/${{ env.date }}
+          mv ../../cert-${{ matrix.androidv }}-${{ matrix.arch }}.* ${{ matrix.arch }}/${{ env.date }}/keys
           rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
 
       - name: Release
@@ -118,6 +118,4 @@ jobs:
           tag_name: ${{ env.date }}
           draft: false
           prerelease: false
-          files: |
-            vendor_gapps/out/*
-            cert.*
+          files: vendor_gapps/out/*
