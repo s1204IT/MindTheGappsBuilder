@@ -81,10 +81,11 @@ jobs:
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
+          mkdir -p out/${{ matrix.arch }}
           mkdir -p out/${{ matrix.arch }}/${{ env.date }}
           mkdir -p out/${{ matrix.arch }}/${{ env.date }}/keys
-          mv cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/${{ env.date }}/keys
-          mv out/*.* out/${{ matrix.arch }}/${{ env.date }}
+          mv -v cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/${{ env.date }}/keys
+          mv -v out/*.* out/${{ matrix.arch }}/${{ env.date }}
 
       - name: Upload
         if: github.event.inputs.release != 'true'
