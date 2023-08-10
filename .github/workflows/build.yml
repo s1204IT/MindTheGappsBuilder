@@ -26,6 +26,12 @@ jobs:
             matrix.androidv = ["9.0.0", "10.0.0", "11.0.0", "12.1.0", "13.0.0"]
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
+            
+      - name: Create signing keys
+        run: |
+          openssl genrsa -f4 2048 > key.pem
+          openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
+          openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
 
   build:
     name: Build ${{ matrix.androidv }}-${{ matrix.arch }}
@@ -58,18 +64,17 @@ jobs:
           if [[ ! -d overlay && ${{ matrix.arch }} == x86_64 ]]; then exit 64; fi
           if [ -d overlay ]; then
             sudo apt-get update
-            sudo apt-get install -y aapt zipalign
+            sudo apt-get install -y aapt zipalign apksigner
             mkdir common/proprietary/product/overlay
             sed -i -e '/overlay/d' build/gapps.sh
             sed -i -e '/RROs/d' build/gapps.sh
-            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android
             echo "Compiling RROs"
             find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
             do
                 echo "Building ${dir/overlay\//}"
                 aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
-                jarsigner -keystore debug.keystore "${dir/overlay\//}".apk.u androiddebugkey -storepass android
                 zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
+                apksigner sign --key cert.pk8 --cert cert.pem "${dir/overlay\//}".apk
                 mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
             done
           fi
@@ -103,6 +108,7 @@ jobs:
           mkdir ${{ matrix.arch }}
           mkdir ${{ matrix.arch }}/${{ env.date }}
           mv *.* ${{ matrix.arch }}/${{ env.date }}
+          mv ../cert.* ${{ matrix.arch }}/${{ env.date }}
           rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
 
       - name: Release
@@ -112,4 +118,6 @@ jobs:
           tag_name: ${{ env.date }}
           draft: false
           prerelease: false
-          files: vendor_gapps/out/*
+          files: |
+            vendor_gapps/out/*
+            cert.*
