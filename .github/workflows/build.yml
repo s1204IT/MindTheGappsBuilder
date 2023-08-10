@@ -66,8 +66,7 @@ jobs:
             sed -i -e '/overlay/d' build/gapps.sh
             sed -i -e '/RROs/d' build/gapps.sh
             echo "Compiling RROs"
-            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir
-            do
+            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
                 echo "Building ${dir/overlay\//}"
                 aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
                 zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
@@ -76,15 +75,16 @@ jobs:
             done
             mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}.pem
             mv cert.pk8 cert-${{ matrix.androidv }}-${{ matrix.arch }}.pk8
+            rm key.pem
           fi
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
-          mkdir out/${{ matrix.arch }}
-          mkdir out/${{ matrix.arch }}/${{ env.date }}
-          mkdir out/${{ matrix.arch }}/${{ env.date }}/keys
+          mkdir -p out/${{ matrix.arch }}/${{ env.date }}
+          mkdir -p out/${{ matrix.arch }}/${{ env.date }}/keys
           mv ../cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/${{ env.date }}/keys
+          mv out/*.* out/${{ matrix.arch }}/${{ env.date }}
 
       - name: Upload
         if: github.event.inputs.release != 'true'
@@ -92,9 +92,8 @@ jobs:
         with:
           name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
           path: |
-            vendor_gapps/out/*.zip
-            vendor_gapps/out/*.zip.md5
-            vendor_gapps/out/keys/
+            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }/*.*
+            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/keys/
           if-no-files-found: warn
 
       - name: Setup SSH
@@ -110,9 +109,7 @@ jobs:
         continue-on-error: true
         if: github.event.inputs.release == 'true'
         working-directory: vendor_gapps/out
-        run: |
-          mv *.* ${{ matrix.arch }}/${{ env.date }}
-          rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
+        run: rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -122,6 +119,5 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            vendor_gapps/out/*.zip
-            vendor_gapps/out/*.zip.md5sum
-            vendor_gapps/out/keys/*
+            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }/*.*
+            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }/keys/*
