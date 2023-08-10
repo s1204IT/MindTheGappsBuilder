@@ -84,10 +84,10 @@ jobs:
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
           mkdir -p out/${{ matrix.arch }}
           mkdir -p out/${{ matrix.arch }}/$cdate
-          mv -v out/*.* out/${{ matrix.arch }}/$cdate
+          mv out/*.* out/${{ matrix.arch }}/$cdate
           if [ -d overlay ]; then
             mkdir -p out/${{ matrix.arch }}/$cdate/keys
-            mv -v cert-${{ matrix.androidv }}-${{ matrix.arch }}.* out/${{ matrix.arch }}/$cdate/keys
+            mv cert-*.* out/${{ matrix.arch }}/$cdate/keys
           fi
 
       - name: Upload
