@@ -103,7 +103,6 @@ jobs:
           ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 0600 ~/.ssh/id_ed25519
-          ssh -T ${{ vars.SF_USER }}@frs.sourceforge.net
 
       - name: Upload to SourceForge
         continue-on-error: true
