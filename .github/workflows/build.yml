@@ -75,8 +75,6 @@ jobs:
               mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
           done
           mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pem
-          mv cert.pk8 cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pk8
-          rm key.pem
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
@@ -84,7 +82,7 @@ jobs:
           mkdir -p out/${{ matrix.arch }}/$cdate
           mv out/*.* out/${{ matrix.arch }}/$cdate
           mkdir -p out/${{ matrix.arch }}/$cdate/keys
-          mv cert-*.* out/${{ matrix.arch }}/$cdate/keys
+          mv cert-*.pem out/${{ matrix.arch }}/$cdate/keys
 
       - name: Upload
         if: github.event.inputs.release != 'true'
