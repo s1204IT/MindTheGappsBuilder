@@ -55,7 +55,6 @@ jobs:
 
       - name: Build
         working-directory: vendor_gapps
-        continue-on-error: true
         run: |
           cdate="$(date -u +%Y%m%d)"
           echo "date=$cdate" >> $GITHUB_ENV
