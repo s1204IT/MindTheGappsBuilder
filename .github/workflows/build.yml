@@ -23,7 +23,7 @@ jobs:
         with:
           script: |
             let matrix = {};
-            matrix.androidv = ["9.0.0", "10.0.0", "11.0.0", "12.1.0", "13.0.0"]
+            matrix.androidv = ["12.1.0", "13.0.0"]
             matrix.arch = ["arm", "arm64", "x86", "x86_64"]
             core.setOutput("matrix", JSON.stringify(matrix));
 
@@ -37,13 +37,15 @@ jobs:
 
       - name: Map Android Version to tree
         run: |
-          declare -A ANDROID_VER_MAP=(["9.0.0"]="pi" ["10.0.0"]="qoppa" ["11.0.0"]="rho" ["12.1.0"]="sigma" ["13.0.0"]="tau")
+          declare -A ANDROID_VER_MAP=(["12.1.0"]="sigma" ["13.0.0"]="tau")
           echo "ANDROIDV=${ANDROID_VER_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
           declare -A ANDROID_API_MAP=(["12.1.0"]=32 ["13.0.0"]=33)
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
       - name: Clone repository
-        run: git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git/
+        run: |
+          git config --global http.version HTTP/1.1
+          git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git/
 
       - name: Setup Java
         uses: actions/setup-java@v3
@@ -53,42 +55,36 @@ jobs:
 
       - name: Build
         working-directory: vendor_gapps
-        continue-on-error: true
         run: |
-          if [[ ! -d overlay && ${{ matrix.arch }} == x86_64 ]]; then exit 64; fi
           cdate="$(date -u +%Y%m%d)"
           echo "date=$cdate" >> $GITHUB_ENV
-          if [ -d overlay ]; then
-            sudo apt-get update
-            sudo apt-get install -y aapt zipalign apksigner
-            openssl genrsa -f4 2048 > key.pem
-            openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
-            openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
-            mkdir common/proprietary/product/overlay
-            sed -i -e '/overlay/d' build/gapps.sh
-            sed -i -e '/RROs/d' build/gapps.sh
-            echo "Compiling RROs"
-            find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
-                echo "Building ${dir/overlay\//}"
-                aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
-                zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
-                apksigner sign --key cert.pk8 --cert cert.pem "${dir/overlay\//}".apk
-                mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
-            done
-            mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pem
-            mv cert.pk8 cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pk8
-            rm key.pem
-          fi
+          sudo apt-get update
+          sudo apt-get install -y aapt zipalign apksigner
+          openssl genrsa -f4 2048 > key.pem
+          openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
+          openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
+          mkdir common/proprietary/product/overlay
+          sed -i -e '/overlay/d' build/gapps.sh
+          sed -i -e '/RROs/d' build/gapps.sh
+          echo "Compiling RROs"
+          find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
+              echo "Building ${dir/overlay\//}"
+              aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
+              zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
+              apksigner sign --key cert.pk8 --cert cert.pem "${dir/overlay\//}".apk
+              mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
+          done
+          mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pem
+          mv cert.pk8 cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pk8
+          rm key.pem
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           ./build/gapps.sh ${{ matrix.arch }}
           sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
           mkdir -p out/${{ matrix.arch }}
           mkdir -p out/${{ matrix.arch }}/$cdate
           mv out/*.* out/${{ matrix.arch }}/$cdate
-          if [ -d overlay ]; then
-            mkdir -p out/${{ matrix.arch }}/$cdate/keys
-            mv cert-*.* out/${{ matrix.arch }}/$cdate/keys
-          fi
+          mkdir -p out/${{ matrix.arch }}/$cdate/keys
+          mv cert-*.* out/${{ matrix.arch }}/$cdate/keys
 
       - name: Upload
         if: github.event.inputs.release != 'true'
