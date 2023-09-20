@@ -42,6 +42,9 @@ jobs:
           declare -A ANDROID_API_MAP=(["12.1.0"]=32 ["13.0.0"]=33)
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Clone repository
         run: |
           git config --global http.version HTTP/1.1
@@ -56,42 +59,37 @@ jobs:
       - name: Build
         working-directory: vendor_gapps
         run: |
-          cdate="$(date -u +%Y%m%d)"
-          echo "date=$cdate" >> $GITHUB_ENV
-          sudo apt-get update
-          sudo apt-get install -y aapt zipalign apksigner
-          openssl genrsa -f4 2048 > key.pem
-          openssl pkcs8 -in key.pem -topk8 -outform DER -out cert.pk8 -nocrypt
-          openssl req -new -x509 -sha256 -key key.pem -out cert.pem -days 10000 -subj '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
           mkdir common/proprietary/product/overlay
-          sed -i -e '/overlay/d' build/gapps.sh
-          sed -i -e '/RROs/d' build/gapps.sh
+          sed -ie '/overlay/d' build/gapps.sh
+          sed -ie '/RROs/d' build/gapps.sh
           echo "Compiling RROs"
+          export PATH=$(realpath ../build-tools/34.0.0):$PATH
+          cp build/sign/testkey.pk8 cert.pk8
           find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
               echo "Building ${dir/overlay\//}"
-              aapt package -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar -F "${dir/overlay\//}".apk.u
-              zipalign -v 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
-              apksigner sign --key cert.pk8 --cert cert.pem "${dir/overlay\//}".apk
-              mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay
+              aapt p -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar --min-sdk-version ${{ env.ANDROID_API }} --target-sdk-version ${{ env.ANDROID_API }} -F "${dir/overlay\//}".apk.u
+              zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
+              apksigner sign --key cert.pk8 --cert build/sign/testkey.x509.pem "${dir/overlay\//}".apk
+              mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay/
           done
-          mv cert.pem cert-${{ matrix.androidv }}-${{ matrix.arch }}-$cdate.pem
-          sed -i -e 's/_%H%M%S//' build/gapps.sh
+          sed -ie 's/_%H%M%S//' build/gapps.sh
+           sed -ie '/cd $OUT/a \ \ \ \ find -exec touch -amt 200901010000.00 {} \\;' build/gapps.sh
+          sed -ie '/Xmx2048/d' build/gapps.sh
+          sed -ie '/Signing/a \ \ \ \ \ \ \ \ mv /tmp/$BUILDZIP /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk' build/gapps.sh
+          sed -ie '/mv/a \ \ \ \ \ \ \ \ apksigner sign --cert $ZIP_KEY_PEM --key $TOP/cert.pk8 /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk' build/gapps.sh
+          sed -ie '/apksigner/a \ \ \ \ \ \ \ \ cp /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk $OUT/$BUILDZIP' build/gapps.sh
+          sed -ie '/rm \/tmp\/$BUILDZIP/d' build/gapps.sh
+          echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
-          sed -i -e 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
-          mkdir -p out/${{ matrix.arch }}
-          mkdir -p out/${{ matrix.arch }}/$cdate
-          mv out/*.* out/${{ matrix.arch }}/$cdate
-          mkdir -p out/${{ matrix.arch }}/$cdate/keys
-          mv cert-*.pem out/${{ matrix.arch }}/$cdate/keys
+          sed -ie 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
+          rm -f out/*e
 
       - name: Upload
         if: github.event.inputs.release != 'true'
         uses: actions/upload-artifact@v3
         with:
           name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
-          path: |
-            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/*.*
-            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/keys/
+          path: vendor_gapps/out/*.*
           if-no-files-found: warn
 
       - name: Setup SSH
@@ -103,10 +101,13 @@ jobs:
           chmod 0600 ~/.ssh/id_ed25519
 
       - name: Upload to SourceForge
-        continue-on-error: true
         if: github.event.inputs.release == 'true'
         working-directory: vendor_gapps/out
-        run: rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
+        run: |
+          mkdir -p ${{ matrix.arch }}
+          mkdir -p ${{ matrix.arch }}/${{ env.date }}
+          mv *.* ${{ matrix.arch }}/${{ env.date }}/
+          rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -115,6 +116,4 @@ jobs:
           tag_name: ${{ env.date }}
           draft: false
           prerelease: false
-          files: |
-            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/*.*
-            vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/keys/*
+          files: vendor_gapps/out/${{ matrix.arch }}/${{ env.date }}/*.*
