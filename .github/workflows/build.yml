@@ -75,10 +75,8 @@ jobs:
           sed -ie 's/_%H%M%S//' build/gapps.sh
           sed -ie '/cd $OUT/a \    find -exec touch -amt 200901010000.00 {} \\;' build/gapps.sh
           sed -ie '/Xmx2048/d' build/gapps.sh
-          sed -ie '/Signing/a \        mv /tmp/$BUILDZIP /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk' build/gapps.sh
-          sed -ie '/mv/a \        apksigner sign --cert $ZIP_KEY_PEM --key $GAPPS_TOP/cert.pk8 /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk' build/gapps.sh
-          sed -ie '/apksigner/a \        cp /tmp/MindTheGapps-$ANDROIDV-$GARCH-$DATE.apk $OUT/$BUILDZIP' build/gapps.sh
-          sed -ie '/rm \/tmp\/$BUILDZIP/d' build/gapps.sh
+          sed -ie '/Signing/a \        apksigner sign --cert $ZIP_KEY_PEM --key $GAPPS_TOP/cert.pk8 --min-sdk-version 28 /tmp/$BUILDZIP' build/gapps.sh
+          sed -ie '/apksigner/a \        cp /tmp/$BUILDZIP $OUT/$BUILDZIP' build/gapps.sh
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
           sed -ie 's@/home/runner/work/MindTheGappsBuilder/MindTheGappsBuilder/vendor_gapps/out/@@' out/MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-$(date -u +%Y%m%d).zip.md5sum
