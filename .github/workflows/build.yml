@@ -10,29 +10,13 @@ on:
         type: boolean
 
 jobs:
-  matrix:
-    name: Generate build matrix
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.setup.outputs.matrix }}
-    steps:
-
-      - name: Generate build matrix
-        id: setup
-        uses: actions/github-script@v6
-        with:
-          script: |
-            let matrix = {};
-            matrix.androidv = ["12.1.0", "13.0.0"]
-            matrix.arch = ["arm", "arm64", "x86", "x86_64"]
-            core.setOutput("matrix", JSON.stringify(matrix));
-
   build:
+    strategy:
+      matrix:
+        arch: ["arm", "arm64", "x86", "x86_64"]
+        androidv: ["12.1.0", "13.0.0"]
     name: Build ${{ matrix.androidv }}-${{ matrix.arch }}
     runs-on: ubuntu-latest
-    needs: matrix
-    strategy:
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
 
       - name: Map Android Version to tree
@@ -54,7 +38,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '8'
+          java-version: '17'
 
       - name: Build
         working-directory: vendor_gapps
@@ -72,6 +56,7 @@ jobs:
               apksigner sign --key cert.pk8 --cert build/sign/testkey.x509.pem "${dir/overlay\//}".apk
               mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay/
           done
+          # Do not combine them into one command!
           sed -ie 's/_%H%M%S//' build/gapps.sh
           sed -ie '/cd $OUT/a \    find -exec touch -amt 200901010000.00 {} \\;' build/gapps.sh
           sed -ie '/Xmx2048/d' build/gapps.sh
