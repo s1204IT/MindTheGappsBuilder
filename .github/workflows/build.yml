@@ -47,7 +47,7 @@ jobs:
           sed -ie '/overlay/d' build/gapps.sh
           sed -ie '/RROs/d' build/gapps.sh
           echo "Compiling RROs"
-          export PATH=$(/usr/local/lib/android/sdk/build-tools/34.0.0):$PATH
+          export PATH="/usr/local/lib/android/sdk/build-tools/34.0.0:$PATH"
           cp build/sign/testkey.pk8 cert.pk8
           find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
               echo "Building ${dir/overlay\//}"
