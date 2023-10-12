@@ -21,9 +21,9 @@ jobs:
 
       - name: Map Android Version to tree
         run: |
-          declare -A ANDROID_VER_MAP=(["12.1.0"]="sigma" ["13.0.0"]="tau" ["14.0.0"="upsilon"])
+          declare -A ANDROID_VER_MAP=(["12.1.0"]="sigma" ["13.0.0"]="tau" ["14.0.0"]="upsilon")
           echo "ANDROIDV=${ANDROID_VER_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
-          declare -A ANDROID_API_MAP=(["12.1.0"]=32 ["13.0.0"]=33 ["14.0.0"=34])
+          declare -A ANDROID_API_MAP=(["12.1.0"]=32 ["13.0.0"]=33 ["14.0.0"]=34)
           echo "ANDROID_API=${ANDROID_API_MAP[${{ matrix.androidv }}]}" >> $GITHUB_ENV
 
       - name: Clone repository
