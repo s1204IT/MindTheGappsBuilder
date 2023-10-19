@@ -44,11 +44,11 @@ jobs:
           sed -i -e '/overlay/d' build/gapps.sh
           sed -i -e '/RROs/d' build/gapps.sh
           echo "Compiling RROs"
-          export PATH="/usr/local/lib/android/sdk/build-tools/34.0.0:$PATH"
+          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
           cp build/sign/testkey.pk8 cert.pk8
           find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
               echo "Building ${dir/overlay\//}"
-              aapt p -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar --min-sdk-version ${{ env.ANDROID_API }} --target-sdk-version ${{ env.ANDROID_API }} -F "${dir/overlay\//}".apk.u
+              aapt p -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I $ANDROID_HOME/platforms/android-${{ env.ANDROID_API }}/android.jar --min-sdk-version ${{ env.ANDROID_API }} --target-sdk-version ${{ env.ANDROID_API }} -F "${dir/overlay\//}".apk.u
               zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
               apksigner sign --key cert.pk8 --cert build/sign/testkey.x509.pem "${dir/overlay\//}".apk
               mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay/
@@ -57,7 +57,7 @@ jobs:
           sed -i -e 's/_%H%M%S//' build/gapps.sh
           sed -i -e '/cd $OUT/a \    find -exec touch -amt 200901010000.00 {} \\;' build/gapps.sh
           sed -i -e '/Xmx2048/d' build/gapps.sh
-          sed -i -e '/Signing/a \        apksigner sign --cert $ZIP_KEY_PEM --key $GAPPS_TOP/cert.pk8 --min-sdk-version 28 /tmp/$BUILDZIP' build/gapps.sh
+          sed -i -e '/Signing/a \        apksigner sign --cert $ZIP_KEY_PEM --key $GAPPS_TOP/cert.pk8 --min-sdk-version 32 /tmp/$BUILDZIP' build/gapps.sh
           sed -i -e '/apksigner/a \        cp /tmp/$BUILDZIP $OUT/$BUILDZIP' build/gapps.sh
           echo "date=$(date -u +%Y%m%d)" >> $GITHUB_ENV
           ./build/gapps.sh ${{ matrix.arch }}
