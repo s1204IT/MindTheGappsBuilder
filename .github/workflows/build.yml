@@ -32,7 +32,7 @@ jobs:
           git clone --depth=1 -b ${{ env.ANDROIDV }} https://gitlab.com/MindTheGapps/vendor_gapps.git/
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -44,11 +44,11 @@ jobs:
           sed -i -e '/overlay/d' build/gapps.sh
           sed -i -e '/RROs/d' build/gapps.sh
           echo "Compiling RROs"
-          export PATH="/usr/local/lib/android/sdk/build-tools/34.0.0:$PATH"
+          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
           cp build/sign/testkey.pk8 cert.pk8
           find overlay -maxdepth 1 -mindepth 1 -type d -print0 | while IFS= read -r -d '' dir; do
               echo "Building ${dir/overlay\//}"
-              aapt p -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_API }}/android.jar --min-sdk-version ${{ env.ANDROID_API }} --target-sdk-version ${{ env.ANDROID_API }} -F "${dir/overlay\//}".apk.u
+              aapt p -M "$dir"/AndroidManifest.xml -S "$dir"/res/ -I $ANDROID_HOME/platforms/android-${{ env.ANDROID_API }}/android.jar --min-sdk-version ${{ env.ANDROID_API }} --target-sdk-version ${{ env.ANDROID_API }} -F "${dir/overlay\//}".apk.u
               zipalign 4 "${dir/overlay\//}".apk.u "${dir/overlay\//}".apk
               apksigner sign --key cert.pk8 --cert build/sign/testkey.x509.pem "${dir/overlay\//}".apk
               mv -v "${dir/overlay\//}".apk common/proprietary/product/overlay/
@@ -65,14 +65,14 @@ jobs:
 
       - name: Upload
         if: github.event.inputs.release != 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Built_MindTheGapps-${{ matrix.androidv }}-${{ matrix.arch }}-${{ env.date }}
           path: vendor_gapps/out/*.*
           if-no-files-found: warn
 
       - name: Setup SSH
-        if: github.event.inputs.release == 'true'
+        if: github.event.inputs.release == 'true' && vars.SF_REPO != ''
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
@@ -80,16 +80,16 @@ jobs:
           chmod 0600 ~/.ssh/id_ed25519
 
       - name: Upload to SourceForge
-        if: github.event.inputs.release == 'true'
+        if: github.event.inputs.release == 'true' && vars.SF_REPO != ''
         working-directory: vendor_gapps/out
         run: |
           mkdir -p ${{ matrix.arch }}
           mkdir -p ${{ matrix.arch }}/${{ env.date }}
           mv *.* ${{ matrix.arch }}/${{ env.date }}/
-          rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/wsa-mtg/
+          rsync -avP -e ssh ${{ matrix.arch }} ${{ vars.SF_USER }}@frs.sourceforge.net:/home/frs/project/${{ vars.SF_REPO }}/
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: github.event.inputs.release == 'true'
         with:
           tag_name: ${{ env.date }}
